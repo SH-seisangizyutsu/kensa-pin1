@@ -127,7 +127,32 @@ body.zoning .zone{opacity:1;background:rgba(29,79,145,.12)}
 #queue .qmsg{flex:none;font-size:13px;font-weight:700;color:var(--accent)}
 #queue img{width:48px;height:48px;object-fit:cover;border-radius:6px;flex:none;border:2px solid transparent}
 #queue img:first-of-type{border-color:var(--accent)}
-.plan-actions{display:flex;gap:8px;padding:8px 12px;background:var(--surface);border-top:1px solid var(--line);flex-wrap:wrap}
+.plan-actions{display:flex;gap:8px;padding:8px 12px;background:var(--surface);border-top:1px solid var(--line);align-items:center}
+#btn-room{flex:1;min-width:0;justify-content:flex-start;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#btn-room.set{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
+/* 図面を広く：上の帯を隠す */
+body.wide #insp .ib, body.wide #insp .toolbar, body.wide #sheet-tabs{display:none}
+.zoom-ctl button[data-z="wide"]{font-size:11px;line-height:1.1}
+/* スマホ：上の帯を1行ずつに詰めて図面を広く */
+@media (max-width:699px){
+  .ib{padding:4px 8px}
+  .ib-title h2{font-size:14px}
+  #i-meta{display:none}
+  .toolbar{flex-wrap:nowrap;overflow-x:auto;gap:6px;padding:4px 8px;scrollbar-width:none}
+  .toolbar::-webkit-scrollbar{display:none}
+  .seg{flex:none}
+  .seg button{padding:4px 12px;min-height:34px}
+  .filters{flex-wrap:nowrap}
+  .fchip{flex:none;min-height:32px;padding:3px 10px}
+  #btn-zone:not(.primary){display:none}
+  #btn-zone{flex:none}
+  #sheet-tabs{padding:4px 8px}
+  #sheet-tabs button{min-height:32px;padding:3px 10px}
+  .plan-actions{padding:6px 8px}
+  .plan-actions .btn{min-height:40px}
+  .zoom-ctl{right:8px;top:8px}
+  .zoom-ctl button{width:40px;height:40px}
+}
 
 #list-wrap{flex:1;overflow:auto;padding:12px 16px 40px}
 .list-inner{max-width:880px;margin:0 auto;display:flex;flex-direction:column;gap:8px}
@@ -156,6 +181,12 @@ body.zoning .zone{opacity:1;background:rgba(29,79,145,.12)}
 .chips{display:flex;flex-wrap:wrap;gap:6px}
 .chip{border:1.5px solid var(--line);background:var(--surface);border-radius:10px;padding:8px 12px;min-height:42px;font-weight:700;font-size:14px}
 .chip.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.pick2{display:grid;grid-template-columns:6.2em 1fr;gap:8px;align-items:start}
+.cats{display:flex;flex-direction:column;gap:4px;position:sticky;top:0}
+.cats button{position:relative;text-align:left;border:1.5px solid var(--line);background:var(--bg);border-radius:8px;padding:6px 8px;min-height:40px;font-weight:700;font-size:13px;line-height:1.25}
+.cats button.on{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
+.cats button.has::after{content:"";position:absolute;right:6px;top:6px;width:8px;height:8px;border-radius:50%;background:var(--accent)}
+.pick2 .chips{align-content:flex-start}
 .chip.same{border-style:dashed;border-color:var(--accent);color:var(--accent);width:100%;text-align:left}
 .hint{margin:6px 0 0;font-size:12px;color:var(--muted)}
 .thumbs{display:flex;gap:8px;flex-wrap:wrap}
@@ -260,12 +291,13 @@ textarea{width:100%;min-height:64px;border:1px solid var(--line);border-radius:1
       <div id="vp">
         <div id="stage"><img id="plan-img" alt="図面" draggable="false"><div id="zones"></div><div id="pins"></div></div>
         <div id="vp-empty" hidden><div class="empty"><b>図面がまだありません</b>平面図・基礎伏図などのPDFや画像を読み込んでください<br><br><button class="btn primary" data-act="add-sheet">図面を追加</button></div></div>
-        <div class="zoom-ctl"><button data-z="in" aria-label="拡大">＋</button><button data-z="out" aria-label="縮小">－</button><button data-z="fit">全体</button></div>
+        <div class="zoom-ctl"><button data-z="in" aria-label="拡大">＋</button><button data-z="out" aria-label="縮小">－</button><button data-z="fit">全体</button><button data-z="wide" aria-pressed="false">図面<br>広く</button></div>
         <div id="tap-hint" class="tap-hint">指摘箇所をタップ ／ 2本指で拡大</div>
       </div>
       <div id="queue" hidden></div>
       <div class="plan-actions">
-        <button id="btn-from-photos" class="btn small">撮っておいた写真からまとめて登録</button>
+        <button id="btn-room" class="btn">部屋を選ぶ</button>
+        <button id="btn-from-photos" class="btn small">写真からまとめて</button>
       </div>
     </div>
     <div id="list-wrap" hidden></div>
@@ -725,7 +757,7 @@ $('#btn-new').onclick = newInspectionDialog;
 function openInspection(id, fallback) {
   const insp = S.inspections.find(i => i.id === id) || fallback;
   if (!insp) return;
-  S.cur = insp; S.pins = []; S.view = 'plan'; S.filter = 'all'; S.queue = []; S.zoneMode = false; syncZoneMode();
+  S.cur = insp; S.pins = []; S.view = 'plan'; S.filter = 'all'; S.queue = []; S.zoneMode = false; syncZoneMode(); S.room = null; renderRoomBtn();
   S.sheetId = insp.sheets?.[0]?.id || null;
   S.unsubP?.(); S.unsubP = S.store.subscribePins(id, pins => { S.pins = pins; renderPins(); renderFilters(); if (S.view === 'list') renderList(); });
   $('#home').hidden = true; $('#insp').hidden = false;
@@ -786,6 +818,13 @@ async function addSheets() {
 
 /* ---------- 図面の表示・拡大縮小・タップ ---------- */
 const vp = $('#vp'), stage = $('#stage'), planImg = $('#plan-img');
+document.querySelector('.zoom-ctl').addEventListener('click', e => {
+  const b = e.target.closest('[data-z="wide"]'); if (!b) return;
+  e.stopPropagation();
+  const on = document.body.classList.toggle('wide');
+  b.innerHTML = on ? '元に<br>戻す' : '図面<br>広く'; b.setAttribute('aria-pressed', on);
+  requestAnimationFrame(() => applyZoom());
+}, true);
 const curSheet = () => S.cur?.sheets?.find(s => s.id === S.sheetId);
 async function showSheet(fit) {
   const sh = curSheet();
@@ -821,7 +860,7 @@ function zoomAt(cx, cy, ns) {
   applyZoom();
 }
 document.querySelector('.zoom-ctl').addEventListener('click', e => {
-  const b = e.target.closest('[data-z]'); if (!b) return;
+  const b = e.target.closest('[data-z]'); if (!b || b.dataset.z === 'wide') return;
   const z = Z(), cx = vp.clientWidth / 2, cy = vp.clientHeight / 2;
   if (b.dataset.z === 'fit') fitZoom(); else zoomAt(cx, cy, z.s * (b.dataset.z === 'in' ? 1.5 : 1 / 1.5));
 });
@@ -956,15 +995,48 @@ async function saveZones(sh, zones) {
   try { await S.store.patchInspection(S.cur.id, { sheets, updatedAt: Date.now() }); S.cur = { ...S.cur, sheets }; renderPins(); }
   catch (e) { toast(errMsg(e)); }
 }
+/* 今いる部屋：先に部屋を選んでおけば、打ったピンに部屋名（と階）が入る。部屋を移ったら選び直す */
+function renderRoomBtn() {
+  const b = $('#btn-room'), r = S.room;
+  b.textContent = r ? `部屋：${[r.floor, r.room].filter(Boolean).join(' ')}（変更）` : '部屋を選んでから入力';
+  b.classList.toggle('set', !!r);
+}
+$('#btn-room').onclick = () => roomDialog();
+function roomDialog() {
+  const sh = curSheet(), m = $('#modal');
+  const floors = sh?.floors?.length ? sh.floors : FLOORS;
+  let floor = S.room?.floor || (floors.length === 1 ? floors[0] : '');
+  const render = () => {
+    m.innerHTML = `<div class="dlg" role="dialog" aria-modal="true"><h3>今いる部屋</h3>
+      <p class="hint" style="margin:0">選んだ部屋は、次に部屋を変えるまで指摘に自動で入ります。</p>
+      ${floors.length > 1 ? `<div><div class="lbl">階</div><div class="chips">${floors.map(f => `<button type="button" class="chip sm ${f === floor ? 'on' : ''}" data-rf="${esc(f)}">${esc(f)}</button>`).join('')}</div></div>` : ''}
+      <div><div class="lbl">部屋（タップで決定）</div><div class="chips">${roomList(S.room?.room).map(r => `<button type="button" class="chip sm ${r === S.room?.room ? 'on' : ''}" data-rr="${esc(r)}">${esc(r)}</button>`).join('')}</div></div>
+      <div class="free"><input id="rd-free" maxlength="30" placeholder="一覧にない部屋名" aria-label="一覧にない部屋名"><button type="button" class="btn small" data-rfree>決定</button></div>
+      <div class="acts"><button type="button" class="btn" data-rnone>部屋を指定しない</button><button type="button" class="btn" data-x>閉じる</button></div></div>`;
+  };
+  const pick = room => { S.room = room ? { floor, room } : null; m.hidden = true; renderRoomBtn(); if (room) toast(`${[floor, room].filter(Boolean).join(' ')} の指摘を入力できます`); };
+  m.onclick = e => {
+    if (e.target.closest('[data-x]')) { m.hidden = true; return; }
+    if (e.target.closest('[data-rnone]')) return pick(null);
+    const f = e.target.closest('[data-rf]'); if (f) { floor = floor === f.dataset.rf ? '' : f.dataset.rf; render(); return; }
+    const r = e.target.closest('[data-rr]'); if (r) return pick(r.dataset.rr);
+    if (e.target.closest('[data-rfree]')) {
+      const v = $('#rd-free').value.trim(); if (!v) return;
+      if (!ROOMS.includes(v)) addCustom('rooms', v);
+      pick(v);
+    }
+  };
+  render(); m.hidden = false;
+}
 function onPlanTap(cx, cy) {
   const sh = curSheet(); if (!sh) return;
   const { x, y } = toNorm(cx, cy);
   if (x < 0 || x > 1 || y < 0 || y > 1) return;
   if (S.zoneMode) { const zs = zonesAt(sh, x, y); if (zs.length > 1) zonePick(zs); else if (zs[0]) zoneDialog(null, zs[0]); return; }
   if (S.ed) return moveDraft(cx, cy);
-  const zn = zoneAt(sh, x, y);
-  const floor = zn?.floor || (sh.floors?.length === 1 ? sh.floors[0] : nearestFloor(sh.id, x, y));
-  const pin = { id: uid(), sheetId: sh.id, x, y, floor, room: zn?.name || '', area: '', part: '', defects: [], defect: '', memo: '', photos: [], status: 'open' };
+  const zn = S.room ? null : zoneAt(sh, x, y);
+  const floor = S.room?.floor || zn?.floor || (sh.floors?.length === 1 ? sh.floors[0] : nearestFloor(sh.id, x, y));
+  const pin = { id: uid(), sheetId: sh.id, x, y, floor, room: S.room?.room || zn?.name || '', area: '', part: '', defects: [], defect: '', memo: '', photos: [], status: 'open' };
   openEditor(pin, true);
   if (S.queue.length) { const q = S.queue.shift(); renderQueue(); addPhotoBlobs([q.file], 'before'); }
 }
@@ -981,7 +1053,7 @@ function moveDraft(cx, cy) {
   const x = (cx - r.left - z.tx) / z.s / sh.w, y = (cy - r.top - z.ty) / z.s / sh.h;
   if (x < 0 || x > 1 || y < 0 || y > 1) return;
   Object.assign(S.ed.draft, { x, y, sheetId: sh.id });
-  const zn = zoneAt(sh, x, y);
+  const zn = S.room ? null : zoneAt(sh, x, y);
   if (zn) { S.ed.draft.room = zn.name; if (zn.floor) S.ed.draft.floor = zn.floor; }
   renderPins(); renderEditor();
 }
@@ -1087,11 +1159,16 @@ function renderEditor(fromTop) {
   const partBtn = (area, p) => `<button class="chip sm ${d.area === area && d.part === p ? 'on' : ''}" data-part="${esc(p)}" data-area="${esc(area)}">${esc(p)}</button>`;
   const known = new Set(tpl.areas.flatMap(a => a[1]));
   const extraParts = [...new Set([...customList('parts'), ...(d.part && !known.has(d.part) ? [d.part] : [])])];
+  /* 左に分類を縦に並べ、右に選んだ分類の部材だけを出す */
+  const groups = [...tpl.areas.filter(a => a[1].length).map(a => [a[0], a[1], a[0]]), ...(extraParts.length ? [['追加', extraParts, 'その他']] : [])];
+  const inGroup = g => d.part && d.area === g[2] && g[1].includes(d.part);
+  if (!groups.some(g => g[0] === ed.tab)) ed.tab = (groups.find(inGroup) || groups.find(g => g[0] === S.last?.area) || groups[0])?.[0];
+  const tab = groups.find(g => g[0] === ed.tab);
   const partSec = `<div><h4>① 部材<em>必須</em></h4>
-    ${tpl.areas.filter(a => a[1].length).map(a => `<div class="pgrp"><span class="glbl">${esc(a[0])}</span>${a[1].map(p => partBtn(a[0], p)).join('')}</div>`).join('')}
-    ${extraParts.length ? `<div class="pgrp"><span class="glbl">追加</span>${extraParts.map(p => partBtn('その他', p)).join('')}</div>` : ''}
+    <div class="pick2"><div class="cats">${groups.map(g => `<button class="${g[0] === ed.tab ? 'on' : ''} ${inGroup(g) ? 'has' : ''}" data-tab="${esc(g[0])}">${esc(g[0])}</button>`).join('')}</div>
+      <div class="chips">${tab ? tab[1].map(p => partBtn(tab[2], p)).join('') : ''}</div></div>
     ${free('part', '一覧にない部材（例：ニッチ、点検口枠）')}</div>`;
-  const area = tpl.areas.find(a => a[0] === d.area);
+  const area = tpl.areas.find(a => a[0] === (d.part ? d.area : tab?.[2]));
   const baseDef = area && area[0] !== 'その他' ? area[2] : [...new Set(tpl.areas.flatMap(a => a[2]))];
   const defList = [...new Set([...baseDef, ...customList('defects'), ...d.defects])];
   const defSec = `<div><h4>② 症状<em>必須・複数可</em></h4><div class="chips">${defList.map(v => `<button class="chip ${d.defects.includes(v) ? 'on' : ''}" data-def="${esc(v)}">${esc(v)}</button>`).join('')}</div>
@@ -1165,6 +1242,8 @@ $('#panel').addEventListener('click', async e => {
   const d = ed.draft;
   const set = e.target.closest('[data-set]');
   if (set) { const f = set.dataset.set, v = set.dataset.v; d[f] = d[f] === v ? '' : v; renderEditor(); return; }
+  const tb = e.target.closest('[data-tab]');
+  if (tb) { ed.tab = tb.dataset.tab; renderEditor(); return; }
   const pt = e.target.closest('[data-part]');
   if (pt) {
     if (d.part === pt.dataset.part && d.area === pt.dataset.area) { d.part = ''; d.area = ''; }
@@ -1178,7 +1257,7 @@ $('#panel').addEventListener('click', async e => {
   const ph = e.target.closest('[data-photo]');
   if (ph) { openPhoto(ph.dataset.photo); return; }
   const a = e.target.closest('[data-act]')?.dataset.act; if (!a) return;
-  if (a === 'same') { Object.assign(d, { area: S.last.area, part: S.last.part, defects: [...S.last.defects] }); renderEditor(); }
+  if (a === 'same') { Object.assign(d, { area: S.last.area, part: S.last.part, defects: [...S.last.defects] }); ed.tab = null; renderEditor(); }
   else if (a === 'manage') manageDialog();
   else if (a === 'cam') addPhotoBlobs(await pickFiles({ capture: true }), 'before');
   else if (a === 'pick') addPhotoBlobs(await pickFiles({ multiple: true }), 'before');
@@ -1382,6 +1461,7 @@ $('#btn-menu').onclick = e => {
     <button data-act="add-sheet">図面を追加<small>PDF・画像</small></button>
     <button data-m="sheet">図面の名前・階を変更<small>いま表示している図面</small></button>
     <button data-m="info">現場名・検査日・検査者を変更</button>
+    <button data-m="zone">部屋を囲んで登録<small>囲んだ範囲に打つと部屋名が自動で入る（PC向き）</small></button>
     <button data-m="delete" class="danger">この検査を削除</button>`;
   m.hidden = false; e.stopPropagation();
 };
@@ -1392,6 +1472,7 @@ $('#menu').addEventListener('click', async e => {
   if (k === 'report' || k === 'csv') exportDialog(k);
   else if (k === 'sheet') sheetDialog();
   else if (k === 'info') infoDialog();
+  else if (k === 'zone') { if (S.view !== 'plan') setView('plan'); if (!S.zoneMode) $('#btn-zone').click(); }
   else if (k === 'delete') {
     if (!await ask(`「${S.cur.name}」の検査を、指摘・写真・図面ごと削除します。元に戻せません。`, '削除する', true)) return;
     busy('削除中…');
