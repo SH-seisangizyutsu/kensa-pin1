@@ -34,7 +34,8 @@ body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:var(
 button,input,select,textarea{font:inherit;color:inherit}
 button{cursor:pointer}
 :focus-visible{outline:3px solid var(--accent);outline-offset:2px}
-#app{height:100%;display:flex;flex-direction:column}
+/* 画面いっぱいに固定（スマホのアドレスバーの裏に隠れないよう 100dvh） */
+#app{position:fixed;inset:0;height:100%;height:100dvh;display:flex;flex-direction:column;overflow:hidden}
 section#home,section#insp{flex:1;min-height:0;display:flex;flex-direction:column}
 
 .bar{background:var(--surface);border-bottom:1px solid var(--line);padding:12px 16px;display:flex;align-items:center;gap:12px}
@@ -96,6 +97,8 @@ section#home,section#insp{flex:1;min-height:0;display:flex;flex-direction:column
 .fchip{border:1.5px solid var(--line);background:var(--surface);border-radius:999px;padding:5px 12px;font-size:13px;font-weight:700;min-height:36px}
 .fchip.on{border-color:var(--ink);background:var(--ink);color:var(--surface)}
 .fchip .d{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:1px}
+.fchip .fs{display:none}
+@media (max-width:699px){.fchip .fs{display:inline}}
 .demo-note{background:var(--fixed);color:#1b1200;font-size:13px;font-weight:700;text-align:center;padding:4px 12px}
 
 #plan-wrap{flex:1;min-height:0;display:flex;flex-direction:column}
@@ -127,7 +130,8 @@ body.zoning .zone{opacity:1;background:rgba(29,79,145,.12)}
 #queue .qmsg{flex:none;font-size:13px;font-weight:700;color:var(--accent)}
 #queue img{width:48px;height:48px;object-fit:cover;border-radius:6px;flex:none;border:2px solid transparent}
 #queue img:first-of-type{border-color:var(--accent)}
-.plan-actions{display:flex;gap:8px;padding:8px 12px;background:var(--surface);border-top:1px solid var(--line);align-items:center}
+.plan-actions{flex:none;display:flex;gap:8px;padding:8px 12px;padding-bottom:max(8px,env(safe-area-inset-bottom,0px));background:var(--surface);border-top:1px solid var(--line);align-items:center}
+.ib,.toolbar,#sheet-tabs,#queue,.demo-note{flex:none}
 #btn-room{flex:1;min-width:0;justify-content:flex-start;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #btn-room.set{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
 /* 図面を広く：上の帯を隠す */
@@ -143,12 +147,16 @@ body.wide #insp .ib, body.wide #insp .toolbar, body.wide #sheet-tabs{display:non
   .seg{flex:none}
   .seg button{padding:4px 12px;min-height:34px}
   .filters{flex-wrap:nowrap}
-  .fchip{flex:none;min-height:32px;padding:3px 10px}
+  .fchip{flex:none;min-height:32px;padding:3px 9px}
+  /* 絞り込みは「色の点＋件数」だけにして1行に収める（横スクロールなし） */
+  .fchip .fl{display:none}
+  .fchip .d{margin-right:4px}
+  .filters{gap:4px}
   #btn-zone:not(.primary){display:none}
   #btn-zone{flex:none}
   #sheet-tabs{padding:4px 8px}
   #sheet-tabs button{min-height:32px;padding:3px 10px}
-  .plan-actions{padding:6px 8px}
+  .plan-actions{padding:6px 8px;padding-bottom:max(6px,env(safe-area-inset-bottom,0px))}
   .plan-actions .btn{min-height:40px}
   .zoom-ctl{right:8px;top:8px}
   .zoom-ctl button{width:40px;height:40px}
@@ -169,7 +177,7 @@ body.wide #insp .ib, body.wide #insp .toolbar, body.wide #sheet-tabs{display:non
 .row img{width:56px;height:56px;object-fit:cover;border-radius:8px;flex:none;background:var(--plan)}
 
 /* 指摘パネル：スマホは下から、PCは右側 */
-#panel{position:fixed;left:0;right:0;bottom:0;max-height:82%;background:var(--surface);border-radius:16px 16px 0 0;box-shadow:var(--shadow);display:flex;flex-direction:column;z-index:30;padding-bottom:env(safe-area-inset-bottom,0px)}
+#panel{position:fixed;left:0;right:0;bottom:0;max-height:82%;max-height:82dvh;background:var(--surface);border-radius:16px 16px 0 0;box-shadow:var(--shadow);display:flex;flex-direction:column;z-index:30;padding-bottom:env(safe-area-inset-bottom,0px)}
 @media (min-width:900px){#panel{left:auto;top:0;width:min(640px,50vw);max-height:none;border-radius:0;border-left:1px solid var(--line)}}
 .ed-head{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--line)}
 .ed-head .pin{position:static;margin:0;transform:none;flex:none}
@@ -240,9 +248,14 @@ textarea{width:100%;min-height:64px;border:1px solid var(--line);border-radius:1
 #photo-ov .ov-top{display:flex;gap:8px;align-items:center;padding:10px 12px;padding-top:max(10px,env(safe-area-inset-top,0px));flex-wrap:wrap}
 #photo-ov .ov-top span{flex:1;font-size:13px;color:#c8d2de;min-width:140px}
 #photo-ov .ov-top .btn{background:#1d2530;border-color:#3a4554;color:#fff}
-#photo-ov .ov-top .btn.primary{background:#e23d2c;border-color:#e23d2c}
 #photo-ov .ov-cv{flex:1;min-height:0;display:grid;place-items:center;padding:8px}
 #photo-ov canvas{max-width:100%;max-height:100%;touch-action:none;background:#222}
+#photo-ov .ov-bottom{display:flex;gap:10px;align-items:center;padding:12px;padding-bottom:max(12px,env(safe-area-inset-bottom,0px));background:#141a22;border-top:1px solid #2a323d;flex-wrap:wrap}
+#photo-ov .ov-bottom .seg{border-color:#3a4554}
+#photo-ov .ov-bottom .seg button{color:#c8d2de}
+#photo-ov .ov-bottom .seg button.on{background:#e23d2c;color:#fff}
+#photo-ov .ov-bottom .btn{background:#1d2530;border-color:#3a4554;color:#fff}
+#photo-ov .ov-bottom .btn.primary{background:#e23d2c;border-color:#e23d2c;flex:1;min-width:150px;font-size:16px;min-height:50px}
 
 #busy{position:fixed;inset:0;background:rgba(10,15,25,.45);z-index:70;display:grid;place-items:center}
 .busy-box{background:var(--surface);border-radius:12px;padding:16px 20px;display:flex;gap:12px;align-items:center;font-weight:700;box-shadow:var(--shadow)}
@@ -782,7 +795,8 @@ function visiblePins() { return S.pins.filter(p => S.filter === 'all' || p.statu
 function renderFilters() {
   const c = countsOf(S.pins);
   const f = [['all', 'すべて', S.pins.length, ''], ['open', '未是正', c.open, 'var(--open)'], ['fixed', '是正済', c.fixed, 'var(--fixed)'], ['ok', '確認済', c.ok, 'var(--ok)']];
-  $('#filters').innerHTML = f.map(([k, l, n, col]) => `<button class="fchip ${S.filter === k ? 'on' : ''}" data-f="${k}">${col ? `<span class="d" style="background:${col}"></span>` : ''}${l} ${n}</button>`).join('');
+  // スマホでは色つきの3つは名前を隠して「●件数」だけ（すべては「全」）
+  $('#filters').innerHTML = f.map(([k, l, n, col]) => `<button class="fchip ${S.filter === k ? 'on' : ''}" data-f="${k}" title="${l}" aria-label="${l} ${n}件">${col ? `<span class="d" style="background:${col}"></span><span class="fl">${l} </span>` : `<span class="fl">すべて </span><span class="fs">全</span>`}${n}</button>`).join('');
 }
 $('#filters').addEventListener('click', e => { const b = e.target.closest('[data-f]'); if (!b) return; S.filter = b.dataset.f; renderFilters(); renderPins(); if (S.view === 'list') renderList(); });
 document.querySelector('.seg').addEventListener('click', e => { const b = e.target.closest('[data-view]'); if (b) setView(b.dataset.view); });
@@ -1413,34 +1427,60 @@ function locatePin(p) {
 /* ---------- 写真の拡大表示・赤ペン ---------- */
 async function openPhoto(id) {
   const ov = $('#photo-ov');
-  ov.innerHTML = `<div class="ov-top"><span>指でなぞると赤ペンで印をつけられます</span><button class="btn small" data-o="undo">1つ戻す</button><button class="btn small" data-o="del">この写真を外す</button><button class="btn small" data-o="close">閉じる</button><button class="btn small primary" data-o="save" hidden>印を保存</button></div><div class="ov-cv"><canvas></canvas></div>`;
+  ov.innerHTML = `<div class="ov-top"><span>指でなぞる＝赤ペン／「文字」を選んでタップ＝テキスト</span><button class="btn small" data-o="del">写真を外す</button><button class="btn small" data-o="close">閉じる</button></div>
+    <div class="ov-cv"><canvas></canvas></div>
+    <div class="ov-bottom">
+      <div class="seg sm"><button type="button" class="on" data-o="mode-pen">✏️ 手書き</button><button type="button" data-o="mode-text">Aa 文字</button></div>
+      <button class="btn small" data-o="undo">1つ戻す</button>
+      <button class="btn small primary" data-o="save">印を保存</button>
+    </div>`;
   ov.hidden = false;
   const cv = $('canvas', ov), g = cv.getContext('2d');
   let im;
   try { im = await loadImg(await S.store.imageUrl(id)); } catch { toast('写真を開けませんでした'); ov.hidden = true; return; }
   cv.width = im.naturalWidth; cv.height = im.naturalHeight;
-  const strokes = []; let cur = null;
+  const actions = []; let cur = null, mode = 'pen';
   const lw = Math.max(4, cv.width * 0.008);
   const draw = () => {
     g.drawImage(im, 0, 0);
     g.strokeStyle = '#ff2a1a'; g.lineWidth = lw; g.lineCap = 'round'; g.lineJoin = 'round';
-    for (const s of strokes) { g.beginPath(); s.forEach((p, i) => i ? g.lineTo(p.x, p.y) : g.moveTo(p.x, p.y)); if (s.length === 1) g.lineTo(s[0].x + .1, s[0].y); g.stroke(); }
-    $('[data-o="save"]', ov).hidden = !strokes.length;
+    for (const a of actions) {
+      if (a.t === 'stroke') {
+        g.beginPath(); a.pts.forEach((p, i) => i ? g.lineTo(p.x, p.y) : g.moveTo(p.x, p.y)); if (a.pts.length === 1) g.lineTo(a.pts[0].x + .1, a.pts[0].y); g.stroke();
+      } else {
+        const fs = Math.max(22, cv.width * 0.035);
+        g.font = `bold ${fs}px sans-serif`; g.textAlign = 'left'; g.textBaseline = 'top';
+        g.lineWidth = fs * 0.2; g.strokeStyle = '#fff'; g.lineJoin = 'round'; g.strokeText(a.text, a.x, a.y);
+        g.fillStyle = '#ff2a1a'; g.fillText(a.text, a.x, a.y);
+      }
+    }
   };
   draw();
   const pos = e => { const r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) / r.width * cv.width, y: (e.clientY - r.top) / r.height * cv.height }; };
-  cv.onpointerdown = e => { cv.setPointerCapture(e.pointerId); cur = [pos(e)]; strokes.push(cur); draw(); };
-  cv.onpointermove = e => { if (!cur) return; cur.push(pos(e)); draw(); };
+  cv.onpointerdown = e => {
+    if (mode === 'text') {
+      const p = pos(e), t = (prompt('写真に入れる文字を入力してください') || '').trim();
+      if (t) { actions.push({ t: 'text', x: p.x, y: p.y, text: t }); draw(); }
+      return;
+    }
+    cv.setPointerCapture(e.pointerId); cur = { t: 'stroke', pts: [pos(e)] }; actions.push(cur); draw();
+  };
+  cv.onpointermove = e => { if (!cur) return; cur.pts.push(pos(e)); draw(); };
   cv.onpointerup = cv.onpointercancel = () => { cur = null; };
   ov.onclick = async e => {
     const o = e.target.closest('[data-o]')?.dataset.o; if (!o) return;
-    if (o === 'undo') { strokes.pop(); draw(); }
+    if (o === 'mode-pen' || o === 'mode-text') {
+      mode = o === 'mode-pen' ? 'pen' : 'text';
+      ov.querySelectorAll('.seg.sm button').forEach(b => b.classList.toggle('on', b.dataset.o === o));
+    }
+    else if (o === 'undo') { actions.pop(); draw(); }
     else if (o === 'close') ov.hidden = true;
     else if (o === 'del') {
       if (S.ed) { S.ed.draft.photos = S.ed.draft.photos.filter(p => p.id !== id); renderEditor(); }
       ov.hidden = true; toast('写真を外しました（「保存」で確定）');
     }
     else if (o === 'save') {
+      if (!actions.length) { toast('まだ書き込みがありません（手書きか文字を入れてから保存）'); return; }
       busy('保存中…');
       try {
         const nid = await S.store.putImage(await canvasBlob(cv, 0.85));
@@ -1565,25 +1605,41 @@ async function exportReport(sel, tag) {
     let rows = '', lastGrp = null, i = 0;
     for (const p of pins) {
       busy(`報告書を作成中… 写真 ${++i}/${pins.length}`);
-      if (groupOf(p) !== lastGrp) { lastGrp = groupOf(p); rows += `<tr class="grp"><td colspan="5">${esc(lastGrp)}</td></tr>`; }
+      if (groupOf(p) !== lastGrp) { lastGrp = groupOf(p); rows += `<div class="grp">${esc(lastGrp)}</div>`; }
       const imgs = async kind => { let h = ''; for (const x of (p.photos || []).filter(x => x.kind === kind)) { const r = await imgData(x.id, 520); if (r) h += `<img src="${r.url()}">`; } return h; };
-      rows += `<tr><td class="no"><span style="background:${COL[p.status]}">${num(p)}</span></td>
-        <td>${pinPlace(p) ? `<small>${esc(pinPlace(p))}</small><br>` : ''}<b>${esc(pinTitle(p))}</b><br><span class="def">${esc(defectText(p))}</span>${p.memo ? `<br><small>${esc(p.memo)}</small>` : ''}<br><small>${esc(insp.sheets?.find(s => s.id === p.sheetId)?.name || '')}</small></td>
-        <td class="ph">${await imgs('before')}</td><td class="ph">${await imgs('after')}</td>
-        <td class="st">${ST[p.status]}<br><small>${p.fixedAt ? '是正 ' + fmtDate(p.fixedAt) : ''}${p.okAt ? '<br>確認 ' + fmtDate(p.okAt) : ''}</small><div class="box"></div></td></tr>`;
+      const before = await imgs('before'), after = await imgs('after');
+      const dates = [p.fixedAt ? '是正 ' + fmtDate(p.fixedAt) : '', p.okAt ? '確認 ' + fmtDate(p.okAt) : ''].filter(Boolean).join('　');
+      rows += `<div class="item">
+        <div class="item-head"><span class="no" style="background:${COL[p.status]}">${num(p)}</span>
+          <div class="item-title">${pinPlace(p) ? `<small>${esc(pinPlace(p))}</small><br>` : ''}<b>${esc(pinTitle(p))}</b> <span class="def">${esc(defectText(p))}</span>${p.memo ? `<br><small>${esc(p.memo)}</small>` : ''}<br><small>${esc(insp.sheets?.find(s => s.id === p.sheetId)?.name || '')}</small></div>
+          <span class="stat" style="color:${COL[p.status]}">${ST[p.status]}</span></div>
+        ${before || after ? `<div class="photos">${before ? `<div class="pcol"><small>指摘写真</small><div class="pimgs">${before}</div></div>` : ''}${after ? `<div class="pcol"><small>是正後</small><div class="pimgs">${after}</div></div>` : ''}</div>` : ''}
+        <div class="item-foot"><small>${esc(dates)}</small><div class="box"></div></div></div>`;
     }
     const c = countsOf(pins);
     const html = `<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(fileBase())}</title>
 <style>body{font-family:"BIZ UDPGothic","Yu Gothic","Meiryo",sans-serif;color:#16212e;margin:24px;font-size:13px}h1{font-size:20px;margin:0 0 6px}h2{font-size:15px;margin:18px 0 6px}
 .head{display:flex;gap:24px;flex-wrap:wrap;border-bottom:2px solid #16212e;padding-bottom:8px;margin-bottom:12px}.head div{min-width:120px}.head small{display:block;color:#5b6878}
-.plan img{width:100%;border:1px solid #ccc}.ph-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;border-bottom:1px solid #16212e;margin:18px 0 6px}.ph-head h2{margin:0}.ph-head span{font-size:12px}table{width:100%;border-collapse:collapse;margin-top:8px}td,th{border:1px solid #b9c2cc;padding:6px;vertical-align:top}th{background:#eef1f4;font-size:12px}
-tr.grp td{background:#16212e;color:#fff;font-weight:bold}td.no span{display:inline-block;min-width:28px;height:28px;border-radius:14px;color:#fff;font-weight:bold;text-align:center;line-height:28px}
-.def{color:#d23a2a;font-weight:bold}td.ph img{width:150px;margin:0 4px 4px 0}td.st{width:90px}.box{border:1px solid #888;width:44px;height:44px;margin-top:6px}.box::before{content:"確認印";font-size:9px;color:#888}
-tr{page-break-inside:avoid}.plan{page-break-after:always}@page{size:A4;margin:12mm}@media print{body{margin:0}}</style></head><body>
+.plan img{width:100%;border:1px solid #ccc}.ph-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;border-bottom:1px solid #16212e;margin:18px 0 6px}.ph-head h2{margin:0}.ph-head span{font-size:12px}
+.grp{background:#16212e;color:#fff;font-weight:bold;padding:6px 10px;border-radius:6px;margin-top:16px}
+.item{border:1px solid #b9c2cc;border-radius:10px;padding:10px 12px;margin-top:10px}
+.item-head{display:flex;gap:10px;align-items:flex-start}
+.item-head .no{display:inline-block;flex:none;min-width:28px;height:28px;border-radius:14px;color:#fff;font-weight:bold;text-align:center;line-height:28px}
+.item-title{flex:1;min-width:0}
+.item-head .stat{flex:none;font-weight:bold;font-size:12px}
+.def{color:#d23a2a;font-weight:bold}
+.photos{display:flex;gap:18px;flex-wrap:wrap;margin-top:8px}
+.pcol{display:flex;flex-direction:column;gap:4px}
+.pcol>small{color:#5b6878;font-weight:bold}
+.pimgs{display:flex;flex-wrap:wrap;gap:4px}
+.pimgs img{width:150px;border:1px solid #ccc}
+.item-foot{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;margin-top:8px;color:#5b6878}
+.box{border:1px solid #888;width:44px;height:44px;flex:none;position:relative}.box::before{content:"確認印";font-size:9px;color:#888;position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+.item,.grp{page-break-inside:avoid}.plan{page-break-after:always}@page{size:A4;margin:12mm}@media print{body{margin:0}}</style></head><body>
 <h1>${esc(tplOf(insp).label)} 指摘一覧${tag ? `（${esc(tag.replace('_', ' '))}）` : ''}</h1>
 <div class="head"><div><small>現場名</small>${esc(insp.name)}</div><div><small>検査日</small>${esc(insp.date || '')}</div><div><small>検査者</small>${esc(insp.inspector || '')}</div><div><small>出力日</small>${new Date().toLocaleDateString('ja-JP')}</div><div><small>件数</small>全${pins.length}件（未是正${c.open}・是正済${c.fixed}・確認済${c.ok}）</div></div>
 ${plans}
-<table><thead><tr><th>№</th><th>場所・部材・症状</th><th>指摘写真</th><th>是正後</th><th>状態</th></tr></thead><tbody>${rows || '<tr><td colspan="5">指摘はありません</td></tr>'}</tbody></table>
+${rows || '<p>指摘はありません</p>'}
 </body></html>`;
     busy();
     await saveFile(fileBase() + (tag ? '_' + tag : '') + '_報告書.html',new Blob([html], { type: 'text/html' }));
@@ -1641,3 +1697,4 @@ $('#btn-demo').onclick = async () => {
 </script>
 
 </body></html>
+
