@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="robots" content="noindex"></head><body>
-<title>現場検査ピン</title>
+<title>ノードログ（NodeLog）</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&display=swap">
@@ -137,6 +137,11 @@ body.zoning .zone{opacity:1;background:rgba(29,79,145,.12)}
 /* 図面を広く：上の帯を隠す */
 body.wide #insp .ib, body.wide #insp .toolbar, body.wide #sheet-tabs{display:none}
 .zoom-ctl button[data-z="wide"]{font-size:11px;line-height:1.1}
+/* 部屋を囲んで登録：見落とされないよう色付きにする。スマホは図面右のボタンから */
+#btn-zone{border:2px solid var(--accent);color:var(--accent);background:var(--accent-soft)}
+#btn-zone.primary{color:var(--accent-ink);background:var(--accent)}
+.zoom-ctl button[data-z="zone"]{display:none;font-size:11px;line-height:1.15;border:2px solid var(--accent);color:var(--accent);background:var(--accent-soft)}
+body.zoning .zoom-ctl button[data-z="zone"]{color:var(--accent-ink);background:var(--accent)}
 /* スマホ：上の帯を1行ずつに詰めて図面を広く */
 @media (max-width:699px){
   .ib{padding:4px 8px}
@@ -152,8 +157,8 @@ body.wide #insp .ib, body.wide #insp .toolbar, body.wide #sheet-tabs{display:non
   .fchip .fl{display:none}
   .fchip .d{margin-right:4px}
   .filters{gap:4px}
-  #btn-zone:not(.primary){display:none}
-  #btn-zone{flex:none}
+  #btn-zone{display:none}
+  .zoom-ctl button[data-z="zone"]{display:block;height:auto;min-height:40px;padding:4px 0}
   #sheet-tabs{padding:4px 8px}
   #sheet-tabs button{min-height:32px;padding:3px 10px}
   .plan-actions{padding:6px 8px;padding-bottom:max(6px,env(safe-area-inset-bottom,0px))}
@@ -270,7 +275,7 @@ textarea{width:100%;min-height:64px;border:1px solid var(--line);border-radius:1
     <header class="bar">
       <div class="brand">
         <span class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s7-6.2 7-12a7 7 0 1 0-14 0c0 5.8 7 12 7 12z"/><path d="M9 10l2 2 4-4"/></svg></span>
-        <div><h1>現場検査ピン</h1><p>図面に印をつけて「何の・どこの・どんな」指摘かを正確に伝える</p></div>
+        <div><h1>ノードログ<small style="font-size:.6em;font-weight:700;margin-left:6px">NodeLog</small></h1><p>図面に印をつけて「何の・どこの・どんな」指摘かを正確に伝える</p></div>
       </div>
     </header>
     <div class="home-body"><div class="home-inner">
@@ -296,7 +301,7 @@ textarea{width:100%;min-height:64px;border:1px solid var(--line);border-radius:1
         <button data-view="list" role="tab">一覧</button>
       </div>
       <div class="filters" id="filters"></div>
-      <button id="btn-zone" class="btn small">部屋を囲んで登録</button>
+      <button id="btn-zone" class="btn small">▢ 部屋を囲んで登録</button>
     </div>
     <div id="demo-note" class="demo-note" hidden>サンプル表示中：ここで入力した内容は保存されません</div>
     <div id="plan-wrap">
@@ -304,7 +309,7 @@ textarea{width:100%;min-height:64px;border:1px solid var(--line);border-radius:1
       <div id="vp">
         <div id="stage"><img id="plan-img" alt="図面" draggable="false"><div id="zones"></div><div id="pins"></div></div>
         <div id="vp-empty" hidden><div class="empty"><b>図面がまだありません</b>平面図・基礎伏図などのPDFや画像を読み込んでください<br><br><button class="btn primary" data-act="add-sheet">図面を追加</button></div></div>
-        <div class="zoom-ctl"><button data-z="in" aria-label="拡大">＋</button><button data-z="out" aria-label="縮小">－</button><button data-z="fit">全体</button><button data-z="wide" aria-pressed="false">図面<br>広く</button></div>
+        <div class="zoom-ctl"><button data-z="in" aria-label="拡大">＋</button><button data-z="out" aria-label="縮小">－</button><button data-z="fit">全体</button><button data-z="wide" aria-pressed="false">図面<br>広く</button><button data-z="zone">部屋<br>登録</button></div>
         <div id="tap-hint" class="tap-hint">指摘箇所をタップ ／ 2本指で拡大</div>
       </div>
       <div id="queue" hidden></div>
@@ -358,6 +363,18 @@ const TPL = {
     ['床組', ['土台','アンカーボルト金物','ホールダウン金物','根太','鋼製束','床合板','断熱材','帯金物','金物','IP','OP','LVL','I型ジョイスト','転び止め'], KUTAI_D],
     ['壁・小屋組', ['スタッド','垂木','トラス','束','野地板','スカート合板'], KUTAI_D],
     ['開口', ['建具','窓'], KUTAI_D],
+    OTHER,
+  ]},
+  /* 足場は立面図にピンを打つ。場所は部屋名の代わりに「面」と「層」で選ぶ */
+  ashiba: { label: '足場点検', sheets: ['立面図（東）','立面図（西）','立面図（南）','立面図（北）','足場計画図','配置図'],
+    rooms: ['東面','西面','南面','北面','1層目','2層目','3層目','4層目','5層目','昇降口','出入口'], areas: [
+    ['手すり・墜落防止', ['手すり','中桟','幅木','先行手すり','開口部'], ['欠落','取外し放置','高さ不足','固定不良','破損']],
+    ['作業床', ['布板・踏板','建物との離れ','端部','段差'], ['すき間（300mm超）','すき間','固定不良','ずれ','破損','たわみ','物の置きっぱなし']],
+    ['壁つなぎ・控え', ['壁つなぎ','控え','筋かい'], ['不足','外れ','取外し放置','間隔過大','固定不良']],
+    ['昇降設備', ['階段','はしご','昇降口'], ['固定不良','手すりなし','破損','開口部の養生なし']],
+    ['建地・脚部', ['建地','ジャッキベース','敷板','根がらみ'], ['沈下・傾き','固定不良','不足','破損']],
+    ['養生・第三者対策', ['メッシュシート','防音シート','朝顔','落下防止ネット','出入口・通路'], ['破れ','結束外れ','たるみ','未設置','飛散のおそれ']],
+    ['表示', ['積載荷重表示','点検表','立入禁止表示'], ['未掲示','記入漏れ','汚損']],
     OTHER,
   ]},
 };
@@ -875,6 +892,7 @@ function zoomAt(cx, cy, ns) {
 }
 document.querySelector('.zoom-ctl').addEventListener('click', e => {
   const b = e.target.closest('[data-z]'); if (!b || b.dataset.z === 'wide') return;
+  if (b.dataset.z === 'zone') { $('#btn-zone').click(); return; }
   const z = Z(), cx = vp.clientWidth / 2, cy = vp.clientHeight / 2;
   if (b.dataset.z === 'fit') fitZoom(); else zoomAt(cx, cy, z.s * (b.dataset.z === 'in' ? 1.5 : 1 / 1.5));
 });
@@ -970,8 +988,9 @@ function drawZoneDraft(r) {
 $('#btn-zone').onclick = () => { S.zoneMode = !S.zoneMode; if (S.zoneMode) { closeEditor(true); if (!curSheet()) { S.zoneMode = false; return toast('先に図面を読み込んでください'); } } syncZoneMode(); };
 function syncZoneMode() {
   const b = $('#btn-zone');
-  b.textContent = S.zoneMode ? '囲み終わる' : '部屋を囲んで登録';
+  b.textContent = S.zoneMode ? '囲み終わる' : '▢ 部屋を囲んで登録';
   b.classList.toggle('primary', !!S.zoneMode);
+  $('.zoom-ctl [data-z="zone"]').innerHTML = S.zoneMode ? '囲み<br>終わる' : '部屋<br>登録';
   document.body.classList.toggle('zoning', !!S.zoneMode);
   $('#tap-hint').textContent = S.zoneMode ? '指でなぞって部屋を四角く囲む ／ 移動は2本指' : '指摘箇所をタップ ／ 2本指で拡大';
 }
@@ -1036,7 +1055,7 @@ function roomDialog() {
     const r = e.target.closest('[data-rr]'); if (r) return pick(r.dataset.rr);
     if (e.target.closest('[data-rfree]')) {
       const v = $('#rd-free').value.trim(); if (!v) return;
-      if (!ROOMS.includes(v)) addCustom('rooms', v);
+      if (!baseRooms().includes(v)) addCustom('rooms', v);
       pick(v);
     }
   };
@@ -1107,7 +1126,9 @@ const pinPlace = p => [p.floor, p.room].filter(Boolean).join(' ');
 function customList(key) { try { const v = JSON.parse(readPref(key) || '[]'); return Array.isArray(v) ? v : []; } catch { return []; } }
 function addCustom(key, v) { const l = customList(key); if (!l.includes(v)) writePref(key, JSON.stringify([...l, v])); }
 const customRooms = () => customList('rooms');
-function roomList(cur) { const l = [...ROOMS, ...customRooms().filter(r => !ROOMS.includes(r))]; if (cur && !l.includes(cur)) l.push(cur); return l; }
+/* 場所の選択肢：足場点検は「面・層」、それ以外は部屋名 */
+const baseRooms = () => tplOf(S.cur).rooms || ROOMS;
+function roomList(cur) { const b = baseRooms(), l = [...b, ...customRooms().filter(r => !b.includes(r))]; if (cur && !l.includes(cur)) l.push(cur); return l; }
 /* 一覧・報告書のまとめ方：部屋ごと（階→部屋の順） or 分類ごと（床・壁・建具…） */
 const groupBy = () => readPref('group') === 'area' ? 'area' : 'room';
 const NO_PLACE = '場所なし';
@@ -1247,7 +1268,7 @@ function addFree(field) {
     if (!tpl.areas.some(x => x[2].includes(v))) addCustom('defects', v);
   } else if (field === 'room') {
     d.room = v;
-    if (!ROOMS.includes(v)) addCustom('rooms', v);
+    if (!baseRooms().includes(v)) addCustom('rooms', v);
   }
   renderEditor();
 }
@@ -1522,7 +1543,25 @@ $('#menu').addEventListener('click', async e => {
     } catch (err) { busy(); toast(errMsg(err)); }
   }
 });
-async function saveFile(filename, data) {
+/* 送る：スマホの共有メニュー（LINE・メール・Teamsなど）にファイルを渡す。使えない端末では保存に切り替える */
+const canShareFiles = () => { try { return !!navigator.canShare?.({ files: [new File(['x'], 'x.txt', { type: 'text/plain' })] }); } catch { return false; } };
+async function saveFile(filename, data, share) {
+  if (share && canShareFiles()) {
+    /* 報告書づくりに時間がかかると共有メニューを開けない端末があるので、できあがってからもう一度タップしてもらう */
+    const file = new File([data], filename, { type: data.type || 'application/octet-stream' }), m = $('#modal');
+    m.innerHTML = `<div class="dlg"><h3>できました</h3><p class="hint" style="margin:0">${esc(filename)}</p>
+      <div class="acts"><button type="button" class="btn" data-x>やめる</button><button type="button" class="btn" data-sv>保存</button><button type="button" class="btn primary" data-sh>送る（LINE・メール）</button></div></div>`;
+    m.hidden = false;
+    m.onclick = async e => {
+      if (e.target.closest('[data-x]')) { m.hidden = true; return; }
+      if (e.target.closest('[data-sv]')) { m.hidden = true; saveFile(filename, data); return; }
+      if (!e.target.closest('[data-sh]')) return;
+      m.hidden = true;
+      try { await navigator.share({ files: [file], title: filename }); }
+      catch (err) { if (err?.name !== 'AbortError') { toast('共有できなかったので保存します'); saveFile(filename, data); } }
+    };
+    return;
+  }
   if (S.downloads) {
     try { await S.downloads.save({ filename, data }); toast('保存しました'); }
     catch (e) { if (e?.code !== 'declined') toast('保存できませんでした'); }
@@ -1541,12 +1580,12 @@ function exportDialog(kind) {
   const picked = () => S.pins.filter(p => (!sel.size || sel.has(p.area)) && (!$('#x-open').checked || p.status === 'open'));
   const tag = () => [...sel].join('・') + ($('#x-open').checked ? '_未是正' : '');
   m.innerHTML = `<form class="dlg" id="f-exp">
-    <h3>${kind === 'report' ? '報告書' : '一覧表（CSV）'}を保存</h3>
+    <h3>${kind === 'report' ? '報告書' : '一覧表（CSV）'}を保存・送る</h3>
     <div><div class="lbl">床・壁・建具などで絞り込む（選ばなければ全部）</div>
       <div class="chips">${areas.map(a => `<button type="button" class="chip" data-ar="${esc(a)}">${esc(a)}</button>`).join('') || '<span class="hint">指摘がまだありません</span>'}</div></div>
     <label class="chk"><input type="checkbox" id="x-open">未是正だけ出す</label>
     <p class="hint" id="x-count" style="margin:0"></p>
-    <div class="acts"><button type="button" class="btn" data-x>やめる</button><button class="btn primary">保存</button></div>
+    <div class="acts"><button type="button" class="btn" data-x>やめる</button><button class="btn" data-mode="save">保存</button>${canShareFiles() ? '<button class="btn primary" data-mode="share">送る（LINE・メール）</button>' : ''}</div>
   </form>`;
   m.hidden = false;
   const count = () => { $('#x-count').textContent = `${picked().length}件を出力します`; };
@@ -1560,19 +1599,19 @@ function exportDialog(kind) {
   $('#x-open').onchange = count;
   $('#f-exp').onsubmit = e => {
     e.preventDefault();
-    const pins = picked(), t = tag();
+    const pins = picked(), t = tag(), share = e.submitter?.dataset.mode === 'share';
     m.hidden = true;
     if (!pins.length) return toast('出力する指摘がありません');
-    kind === 'report' ? exportReport(pins, t) : exportCsv(pins, t);
+    kind === 'report' ? exportReport(pins, t, share) : exportCsv(pins, t, share);
   };
 }
-function exportCsv(sel, tag) {
+function exportCsv(sel, tag, share) {
   const sheetName = id => S.cur.sheets?.find(s => s.id === id)?.name || '';
   const rows = [['番号', '図面', '階', '部屋', '分類', '部材', '症状', 'メモ', '状態', '登録日', '是正日', '確認日', '現場名', '検査日', '検査者']];
  const num = pinNums();
   sortPins([...sel]).forEach(p => rows.push([num(p), sheetName(p.sheetId), p.floor, p.room, p.area, p.part, defectText(p), p.memo, ST[p.status], fmtDate(p.createdAt), fmtDate(p.fixedAt), fmtDate(p.okAt), S.cur.name, S.cur.date, S.cur.inspector]));
   const csv = '﻿' + rows.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\r\n');
-  saveFile(fileBase() + (tag ? '_' + tag : '') + '_指摘一覧.csv',new Blob([csv], { type: 'text/csv' }));
+  saveFile(fileBase() + (tag ? '_' + tag : '') + '_指摘一覧.csv',new Blob([csv], { type: 'text/csv' }), share);
 }
 async function imgData(id, max) {
   try {
@@ -1584,7 +1623,7 @@ async function imgData(id, max) {
   } catch { return null; }
 }
 const COL = { open: '#d23a2a', fixed: '#c97f06', ok: '#2e8649' };
-async function exportReport(sel, tag) {
+async function exportReport(sel, tag, share) {
   const insp = S.cur, pins = sortPins([...sel]), num = pinNums();
   busy('報告書を作成中…');
   try {
@@ -1642,7 +1681,7 @@ ${plans}
 ${rows || '<p>指摘はありません</p>'}
 </body></html>`;
     busy();
-    await saveFile(fileBase() + (tag ? '_' + tag : '') + '_報告書.html',new Blob([html], { type: 'text/html' }));
+    await saveFile(fileBase() + (tag ? '_' + tag : '') + '_報告書.html',new Blob([html], { type: 'text/html' }), share);
   } catch (e) { busy(); console.error(e); toast('報告書を作成できませんでした'); }
 }
 
