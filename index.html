@@ -268,6 +268,9 @@ textarea{width:100%;min-height:64px;border:1px solid var(--line);border-radius:1
 @keyframes sp{to{transform:rotate(360deg)}}
 #toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%) translateY(20px);background:var(--ink);color:var(--surface);padding:10px 16px;border-radius:10px;font-weight:700;font-size:14px;opacity:0;pointer-events:none;transition:.2s;z-index:80;max-width:calc(100% - 32px)}
 #toast.show{opacity:1;transform:translateX(-50%)}
+/* 部屋名を使わない検査（基礎検査）では部屋のボタンを出さない */
+body.noroom #btn-zone,body.noroom #btn-room,body.noroom .zoom-ctl button[data-z="zone"]{display:none!important}
+.add-ns{width:100%;margin-bottom:10px}
 </style>
 
 <div id="app">
@@ -308,7 +311,7 @@ textarea{width:100%;min-height:64px;border:1px solid var(--line);border-radius:1
       <div id="sheet-tabs"></div>
       <div id="vp">
         <div id="stage"><img id="plan-img" alt="図面" draggable="false"><div id="zones"></div><div id="pins"></div></div>
-        <div id="vp-empty" hidden><div class="empty"><b>図面がまだありません</b>平面図・基礎伏図などのPDFや画像を読み込んでください<br><br><button class="btn primary" data-act="add-sheet">図面を追加</button></div></div>
+        <div id="vp-empty" hidden><div class="empty"><b>図面がまだありません</b>平面図・基礎伏図などのPDFや画像を読み込んでください<br><br><button class="btn primary" data-act="add-sheet">図面を追加</button><br><br><button class="btn" data-act="add-nosheet">図面なしで指摘を追加</button></div></div>
         <div class="zoom-ctl"><button data-z="in" aria-label="拡大">＋</button><button data-z="out" aria-label="縮小">－</button><button data-z="fit">全体</button><button data-z="wide" aria-pressed="false">図面<br>広く</button><button data-z="zone">部屋<br>登録</button></div>
         <div id="tap-hint" class="tap-hint">指摘箇所をタップ ／ 2本指で拡大</div>
       </div>
@@ -332,36 +335,46 @@ textarea{width:100%;min-height:64px;border:1px solid var(--line);border-radius:1
 <script>
 'use strict';
 /* ---------- 検査種別ごとの選択肢（部位 → 部材 → 症状） ---------- */
-const HAIKIN_D = ['かぶり不足','間隔不良','定着長さ不足','継手長さ不足','結束不良','位置ずれ','本数不足','径違い','欠落','錆・汚れ'];
-const ANCHOR_D = ['位置ずれ','本数不足','高さ不良','固定不良','径違い','欠落'];
-const KUTAI_D = ['取付不良','不足','位置ずれ','割れ','倒れ・垂直不良','たわみ','濡れ・汚れ','仕様まちがい','釘不足','釘ピッチ不良','めりこみ','寸法まちがい','破損','要交換','要清掃','養生不足'];
+const HAIKIN_D = ['かぶり不足','間隔不良','定着長さ不足','継手長さ不足','結束不良','位置ずれ','本数不足','径違い','欠落','補強筋なし','スペーサー不足','錆・汚れ'];
+const ANCHOR_D = ['芯ずれ','出寸法不良','倒れ','本数不足','固定不良','径違い','欠落'];
+const KUTAI_D = ['取付不良','不足','位置ずれ','割れ','倒れ・垂直不良','たわみ','レベル不良','目違い','濡れ・汚れ','仕様まちがい','配列まちがい','釘不足','釘ピッチ不良','釘の打ち抜け','めりこみ','重ね不足','破れ','穴あけ不良','寸法まちがい','破損','要交換','要清掃','養生不足'];
 const OTHER = ['その他', [], ['要確認','清掃','養生','その他']];
+/* noRoom：部屋名を使わない（一覧・報告書は分類ごと）。free：候補なしで自由に入力、図面なしでも登録できる */
 const TPL = {
   kansei: { label: '竣工検査', sheets: ['配置図','仕上表1','仕上表2','仕上表3','1階平面図','2階平面図','1階展開図','2階展開図','立面図','電気図','空調図'], areas: [
     ['床', ['フローリング','CF','畳','タイル','巾木','框','見切り'], ['キズ','凹み','汚れ','隙間','浮き','床鳴り','割れ']],
-    ['壁', ['クロス','入隅','出隅','スイッチ・コンセント','見切り','タイル'], ['キズ','凹み','汚れ','剥がれ','浮き','ジョイント開き','割れ']],
+    ['壁', ['クロス','パイン','入隅','出隅','スイッチ・コンセント','見切り','タイル'], ['キズ','凹み','汚れ','剥がれ','浮き','ジョイント開き','割れ']],
     ['天井', ['クロス','廻り縁','点検口','照明・器具'], ['汚れ','剥がれ','浮き','ジョイント開き','割れ','シミ']],
     ['建具', ['ドア本体','枠','額縁','取っ手・レバー','丁番','戸当り','引戸レール'], ['キズ','凹み','汚れ','建付け不良','隙間','開閉不良','部品不足']],
     ['窓', ['ハンドル（取っ手）','金物','ガラス','網戸','額縁','窓室内側','窓屋外側','窓側面（隠ぺい部）'], ['キズ','汚れ','開閉不良','割れ','隙間','シール不良']],
+    ['塗装', ['窓','線物','枠'], ['色ムラ','垂れ','塗り分け不良','ざらつき','キズ','汚れ']],
     ['造作・収納', ['カウンター','棚板','階段','手すり','収納扉','枕棚・パイプ'], ['キズ','凹み','汚れ','ガタつき','隙間','取付不良']],
-    ['設備', ['キッチン','洗面台','浴室','トイレ','給湯器','換気扇','照明','水栓'], ['キズ','汚れ','動作不良','水漏れ','部品不足','取付不良']],
-    ['外部', ['外壁','軒天','基礎','雨樋','玄関ドア','バルコニー','サンデッキ','タイル','建具','ステップ','設備機器','外構'], ['キズ','汚れ','割れ','シーリング不良','塗装ムラ','取付不良']],
+    ['玄関', ['玄関ドア','タイル','敷居'], ['開閉不良','施錠不良','水勾配不良','シーリング不良','キズ','汚れ']],
+    ['設備', ['キッチン','洗面台','浴室','トイレ','給湯器','換気扇','照明','水栓','電気設備','換気空調','給排水'], ['キズ','汚れ','動作不良','水漏れ','部品不足','取付不良','点灯不良','排水不良','アースなし']],
+    ['小屋裏・床下', ['断熱材','配管','配線','ヘッダー','気密BOX'], ['脱落','固定不良','水漏れ','清掃不足']],
+    ['外部', ['外壁','軒天','基礎','雨樋','シーリング','外気フード','メーター','枡','玄関ドア','バルコニー','サンデッキ','下屋','土間','タイル','建具','ステップ','設備機器','外構'], ['キズ','汚れ','割れ','シーリング不良','塗装ムラ','取付不良','節穴','ビス忘れ','バリ']],
     OTHER,
   ]},
-  /* 基礎は特殊なので今回は新規作成の選択肢から外す（前に作った検査は開ける） */
-  haikin: { label: '配筋検査', hidden: true, areas: [
-    ['ベース', ['主筋','配力筋','補強筋','スペーサー','防湿シート'], HAIKIN_D],
+  haikin: { label: '基礎検査', noRoom: true, sheets: ['配置図','改良図','基礎凡例図','基礎伏図','土台伏図'], areas: [
+    ['配置・寸法', ['配置（境界からの離れ）','全長','対角','捨てコンレベル','GL','遣り方'], ['位置ずれ','芯ずれ','寸法不良','レベル不良']],
+    ['ベース', ['主筋','配力筋','補強筋','スペーサー（サイコロ）','防湿フィルム'], [...HAIKIN_D, '重ね不足', '破れ']],
     ['立上り', ['上端筋','下端筋','縦筋','腹筋','定着','継手'], HAIKIN_D],
     ['人通口', ['補強筋','主筋'], HAIKIN_D],
     ['開口・スリーブ', ['スリーブ','開口補強筋'], HAIKIN_D],
-    ['アンカーボルト', ['アンカーボルト','座金'], ANCHOR_D],
+    ['段基礎・独立基礎', ['深基礎段差部','斜筋','独立基礎','補強筋'], HAIKIN_D],
+    ['アンカーボルト', ['アンカーボルト','高耐力アンカーボルト','座金'], ANCHOR_D],
     ['ホールダウン', ['HDアンカー'], ANCHOR_D],
-    ['型枠', ['型枠','セパ・止め'], ['位置ずれ','高さ不良','固定不良','汚れ・ゴミ']],
+    ['型枠', ['型枠','セパ・止め'], ['位置ずれ','寸法不良','高さ不良','固定不良','汚れ・ゴミ']],
+    ['出来形', ['立上り','ベース','天端','土間','人通口・点検口'], ['寸法不足（幅・高さ・厚さ）','天端不陸','ジャンカ','クラック','目違い','コールドジョイント','位置ずれ']],
     OTHER,
   ]},
   tatekata: { label: '躯体検査', sheets: ['配置図','基礎伏図','土台伏図','1階床伏図','1階パネル図','1階小屋伏図','2階床伏図','2階パネル図','2階天井根太伏図','小屋伏図','1階平面図','2階平面図'], areas: [
-    ['床組', ['土台','アンカーボルト金物','ホールダウン金物','根太','鋼製束','床合板','断熱材','帯金物','金物','IP','OP','LVL','I型ジョイスト','転び止め'], KUTAI_D],
-    ['壁・小屋組', ['スタッド','垂木','トラス','束','野地板','スカート合板'], KUTAI_D],
+    ['床組', ['土台','大引き','アンカーボルト金物','ホールダウン金物','根太','鋼製束','床合板','断熱受けボード','断熱材','帯金物','金物','LVL','I型ジョイスト','転び止め'], KUTAI_D],
+    ['壁・小屋組', ['OP','IP','頭つなぎ','スタッド','垂木','トラス','束','振れ止め','野地板','スカート合板'], KUTAI_D],
+    ['まぐさ・梁', ['まぐさ','まぐさ受','梁','合わせまぐさ'], KUTAI_D],
+    ['金物', ['フレームコーナー','BP（ビームプレート）','TS（あおり止め）','STC','S-65帯金物','鋼製火打ち','庇受け'], KUTAI_D],
+    ['屋根下地', ['野地合板','破風','ルーフィング','棟換気','天窓'], KUTAI_D],
+    ['防水・気密・断熱', ['透湿防水シート','防水テープ','防湿気密フィルム','継目断熱材','気密パッキン','基礎パッキン'], KUTAI_D],
     ['開口', ['建具','窓'], KUTAI_D],
     OTHER,
   ]},
@@ -370,13 +383,29 @@ const TPL = {
     rooms: ['東面','西面','南面','北面','1層目','2層目','3層目','4層目','5層目','昇降口','出入口'], areas: [
     ['手すり・墜落防止', ['手すり','中桟','幅木','先行手すり','開口部'], ['欠落','取外し放置','高さ不足','固定不良','破損']],
     ['作業床', ['布板・踏板','建物との離れ','端部','段差'], ['すき間（300mm超）','すき間','固定不良','ずれ','破損','たわみ','物の置きっぱなし']],
-    ['壁つなぎ・控え', ['壁つなぎ','控え','筋かい'], ['不足','外れ','取外し放置','間隔過大','固定不良']],
-    ['昇降設備', ['階段','はしご','昇降口'], ['固定不良','手すりなし','破損','開口部の養生なし']],
+    ['壁つなぎ・控え', ['壁つなぎ','控え','筋かい','火打ち'], ['不足','外れ','取外し放置','間隔過大','固定不良']],
+    ['昇降設備', ['階段','はしご','昇降口','踊り場'], ['固定不良','手すりなし','破損','開口部の養生なし','踊り場なし（4m以内）']],
     ['建地・脚部', ['建地','ジャッキベース','敷板','根がらみ'], ['沈下・傾き','固定不良','不足','破損']],
-    ['養生・第三者対策', ['メッシュシート','防音シート','朝顔','落下防止ネット','出入口・通路'], ['破れ','結束外れ','たるみ','未設置','飛散のおそれ']],
-    ['表示', ['積載荷重表示','点検表','立入禁止表示'], ['未掲示','記入漏れ','汚損']],
+    ['屋根足場', ['屋根手すり','親綱','親綱支柱','屋根足場'], ['未設置','高さ不足','固定不良','破損','屋根勾配6寸以上で屋根足場なし']],
+    ['養生・第三者対策', ['メッシュシート','防音シート','水平養生','朝顔','落下防止ネット','出入口・通路'], ['破れ','結束外れ','たるみ','未設置','飛散のおそれ']],
+    ['表示', ['積載荷重表示','点検表','点検ステッカー','作業主任者表示','立入禁止表示'], ['未掲示','記入漏れ','汚損']],
     OTHER,
   ]},
+  /* 安全パトロールチェックシートの9分類。場所は敷地の中のどこか */
+  anpato: { label: '安全パトロール', sheets: ['配置図','1階平面図','2階平面図','立面図','足場計画図'],
+    rooms: ['前面道路','敷地入口','敷地内','資材置場','産廃置場','仮設トイレ','建物外周','足場','建物内部','屋根'], areas: [
+    ['看板・表示', ['建築確認表示','建設業許可','労災保険成立票','作業主任者・有資格者表示','環境方針','緊急連絡先','道路使用許可','安全標識・立入禁止','熱中症対策表示'], ['未掲示','記入漏れ','汚損','期限切れ']],
+    ['保護具', ['保護帽','墜落制止用器具','保護メガネ・マスク'], ['未着用','着用不良（あごひも等）','使用期限切れ','不適切']],
+    ['仮設電気', ['仮設電柱','仮設BOX','配線','引込線'], ['固定不良','蓋の開放','アースなし','絶縁カバーなし','通路上の配線','足場に接触']],
+    ['足場', ['敷盤・根がらみ','作業床','手すり・中桟','筋かい・火打ち','昇降設備','屋根手すり・親綱','メッシュシート','積載荷重表示','点検表'], ['未設置','不足','固定不良','離れ過大（30cm超）','破損','物の放置','記録なし']],
+    ['脚立', ['脚立','脚立足場','点検ステッカー'], ['損傷・変形','不正使用（はしご代わり・天板作業）','固定不良','未貼付']],
+    ['内部昇降設備', ['はしご','ステップ階段'], ['固定不良','出寸法不足（600未満）','手すりなし','材質不良']],
+    ['開口部', ['仮床','手すり・中桟','床下点検口'], ['未設置','強度不足','養生なし','表示なし']],
+    ['工具', ['丸ノコ','キャブタイヤコード','釘打機','コードリール','電動工具'], ['安全カバー不良','破損・ひび割れ','保護メガネ未使用','巻いたまま使用','アースなし','整理不良','点検ステッカーなし']],
+    ['環境整備', ['前面道路・清掃','工事車両・駐車','誘導員・カラーコーン','入口ゲート','仮設フェンス','敷地内養生','産廃置場','禁煙','救急箱','消火器','火気','ラジオの音','仮設水道','仮設トイレ','立入禁止措置','資材の整理','熱中症対策備品','安全掲示物','安全作業日報','KIZUKU入退場記録'], ['不良','未設置','汚れ・散乱','施錠なし','分別不良','期限切れ','喫煙','音が大きい','記録なし','未掲示']],
+    OTHER,
+  ]},
+  free: { label: 'フリー報告書', free: true, sheets: [], rooms: [], areas: [] },
 };
 const ST = { open: '未是正', fixed: '是正済', ok: '確認済' };
 const FLOORS = ['基礎', '1階', '2階', '3階', '屋根', '外部'];
@@ -787,12 +816,14 @@ $('#btn-new').onclick = newInspectionDialog;
 function openInspection(id, fallback) {
   const insp = S.inspections.find(i => i.id === id) || fallback;
   if (!insp) return;
-  S.cur = insp; S.pins = []; S.view = 'plan'; S.filter = 'all'; S.queue = []; S.zoneMode = false; syncZoneMode(); S.room = null; renderRoomBtn();
+  S.cur = insp; S.pins = []; S.last = null; S.view = 'plan'; S.filter = 'all'; S.queue = []; S.zoneMode = false; syncZoneMode(); S.room = null; renderRoomBtn();
   S.sheetId = insp.sheets?.[0]?.id || null;
   S.unsubP?.(); S.unsubP = S.store.subscribePins(id, pins => { S.pins = pins; renderPins(); renderFilters(); if (S.view === 'list') renderList(); });
   $('#home').hidden = true; $('#insp').hidden = false;
   $('#demo-note').hidden = S.store.mode !== 'demo';
-  renderInspHeader(); renderSheetTabs(); setView('plan'); renderQueue();
+  document.body.classList.toggle('noroom', !!tplOf(insp).noRoom);
+  /* フリー報告書で図面がなければ、最初から一覧（図面なしで追加）を出す */
+  renderInspHeader(); renderSheetTabs(); setView(tplOf(insp).free && !insp.sheets?.length ? 'list' : 'plan'); renderQueue();
   requestAnimationFrame(() => showSheet(true));
 }
 function closeInspection() {
@@ -800,6 +831,7 @@ function closeInspection() {
   S.unsubP?.(); S.unsubP = null; S.cur = null; S.pins = []; S.queue = []; S.zoneMode = false; syncZoneMode();
   if (S.store !== S.realStore) { S.store = S.realStore; }
   $('#insp').hidden = true; $('#home').hidden = false; $('#menu').hidden = true;
+  document.body.classList.remove('noroom');
   renderHome();
 }
 $('#btn-back').onclick = closeInspection;
@@ -1008,7 +1040,7 @@ function zoneDialog(rect, zone) {
     $('#f-zone').onsubmit = async e => {
       e.preventDefault();
       const typed = $('#z-new').value.trim();
-      if (typed) { name = typed; if (!roomList().includes(typed)) writePref('rooms', JSON.stringify([...customRooms(), typed])); }
+      if (typed) { name = typed; if (!roomList().includes(typed)) addCustom('rooms', typed); }
       if (!name) return toast('部屋名を選んでください');
       m.hidden = true;
       const nz = { ...(zone || { id: uid(), ...rect }), name, floor };
@@ -1069,10 +1101,19 @@ function onPlanTap(cx, cy) {
   if (S.ed) return moveDraft(cx, cy);
   const zn = S.room ? null : zoneAt(sh, x, y);
   const floor = S.room?.floor || zn?.floor || (sh.floors?.length === 1 ? sh.floors[0] : nearestFloor(sh.id, x, y));
-  const pin = { id: uid(), sheetId: sh.id, x, y, floor, room: S.room?.room || zn?.name || '', area: '', part: '', defects: [], defect: '', memo: '', photos: [], status: 'open' };
+  const noRoom = tplOf(S.cur).noRoom;
+  const pin = { id: uid(), sheetId: sh.id, x, y, floor: noRoom ? '' : floor, room: noRoom ? '' : S.room?.room || zn?.name || '', area: '', part: '', defects: [], defect: '', memo: '', photos: [], status: 'open' };
   openEditor(pin, true);
   if (S.queue.length) { const q = S.queue.shift(); renderQueue(); addPhotoBlobs([q.file], 'before'); }
 }
+/* 図面なしの指摘（写真と一覧だけ。報告書の図面ページには出ない） */
+function addNoSheetPin() {
+  if (!S.cur) return;
+  if (S.zoneMode) { S.zoneMode = false; syncZoneMode(); }
+  const noRoom = tplOf(S.cur).noRoom;
+  openEditor({ id: uid(), sheetId: '', x: null, y: null, floor: '', room: noRoom ? '' : S.room?.room || '', area: '', part: '', defects: [], defect: '', memo: '', photos: [], status: 'open' }, true);
+}
+document.addEventListener('click', e => { if (e.target.closest('[data-act="add-nosheet"]')) addNoSheetPin(); });
 /* 1枚に複数階が載った図面では、近くのピンと同じ階を初期値にする */
 function nearestFloor(sheetId, x, y) {
   let best = '', bd = 0.25;
@@ -1123,14 +1164,16 @@ function areaIndex(name) { const i = tplOf(S.cur).areas.findIndex(a => a[0] === 
 function pinTitle(p) { return (p.area && p.area !== 'その他' && p.area !== p.part ? p.area + ' ' : '') + (p.part || '') || '（部材未選択）'; }
 const defectText = p => (p.defects?.length ? p.defects : [p.defect].filter(Boolean)).join('・');
 const pinPlace = p => [p.floor, p.room].filter(Boolean).join(' ');
-function customList(key) { try { const v = JSON.parse(readPref(key) || '[]'); return Array.isArray(v) ? v : []; } catch { return []; } }
-function addCustom(key, v) { const l = customList(key); if (!l.includes(v)) writePref(key, JSON.stringify([...l, v])); }
+/* フリー報告書で打った言葉は、ほかの検査の候補に混ざらないよう別に覚える */
+const prefKey = key => tplOf(S.cur).free ? 'free-' + key : key;
+function customList(key) { try { const v = JSON.parse(readPref(prefKey(key)) || '[]'); return Array.isArray(v) ? v : []; } catch { return []; } }
+function addCustom(key, v) { const l = customList(key); if (!l.includes(v)) writePref(prefKey(key), JSON.stringify([...l, v])); }
 const customRooms = () => customList('rooms');
 /* 場所の選択肢：足場点検は「面・層」、それ以外は部屋名 */
 const baseRooms = () => tplOf(S.cur).rooms || ROOMS;
 function roomList(cur) { const b = baseRooms(), l = [...b, ...customRooms().filter(r => !b.includes(r))]; if (cur && !l.includes(cur)) l.push(cur); return l; }
 /* 一覧・報告書のまとめ方：部屋ごと（階→部屋の順） or 分類ごと（床・壁・建具…） */
-const groupBy = () => readPref('group') === 'area' ? 'area' : 'room';
+const groupBy = () => tplOf(S.cur).noRoom || readPref('group') === 'area' ? 'area' : 'room';
 const NO_PLACE = '場所なし';
 function groupOf(p) { return groupBy() === 'area' ? (p.area || '未分類') : (pinPlace(p) || NO_PLACE); }
 function sortPins(pins) {
@@ -1148,8 +1191,10 @@ function renderList() {
   const pins = sortPins(visiblePins());
   const sheetName = id => S.cur.sheets?.find(s => s.id === id)?.name || '';
   const g = groupBy(), num = pinNums();
-  let html = `<div class="grp-by"><span>まとめ方</span><div class="seg sm">${[['room', '部屋ごと'], ['area', '分類ごと']].map(([k, l]) => `<button class="${g === k ? 'on' : ''}" data-group="${k}">${l}</button>`).join('')}</div></div>`, lastGrp = null;
-  if (!pins.length) html += `<div class="empty"><b>${S.pins.length ? 'この条件の指摘はありません' : 'まだ指摘がありません'}</b>図面の指摘箇所をタップすると登録できます</div>`;
+  const tpl = tplOf(S.cur), noSheet = tpl.free || !S.cur.sheets?.length;
+  let html = (noSheet ? '<button class="btn primary add-ns" data-act="add-nosheet">＋ 図面なしで指摘を追加</button>' : '')
+    + (tpl.noRoom ? '' : `<div class="grp-by"><span>まとめ方</span><div class="seg sm">${[['room', '部屋ごと'], ['area', '分類ごと']].map(([k, l]) => `<button class="${g === k ? 'on' : ''}" data-group="${k}">${l}</button>`).join('')}</div></div>`), lastGrp = null;
+  if (!pins.length) html += `<div class="empty"><b>${S.pins.length ? 'この条件の指摘はありません' : 'まだ指摘がありません'}</b>${noSheet ? '「図面なしで指摘を追加」か、' : ''}図面の指摘箇所をタップすると登録できます</div>`;
   for (const p of pins) {
     const gk = groupOf(p);
     if (gk !== lastGrp) { html += `<div class="grp">${esc(gk)}　${pins.filter(x => groupOf(x) === gk).length}件</div>`; lastGrp = gk; }
@@ -1182,11 +1227,13 @@ function renderEditor(fromTop) {
   const chips = (list, field, cur, cls = '') => list.map(v => `<button class="chip ${cls} ${v === cur ? 'on' : ''}" data-set="${field}" data-v="${esc(v)}">${esc(v)}</button>`).join('');
   const free = (field, ph) => `<div class="free"><input id="free-${field}" maxlength="30" placeholder="${ph}" aria-label="${ph}"><button class="btn small" data-free="${field}">追加</button></div>`;
   const place = pinPlace(d) ? `<span class="ph">${esc(pinPlace(d))}</span>　` : '';
-  const sum = d.part || d.defects.length ? `${place}${esc(d.part ? pinTitle(d) : '')}　<span style="color:var(--open)">${esc(d.defects.join('・'))}</span>` : `${place}<span class="ph">部材と症状を選んでください</span>`;
+  /* フリー報告書は「部材・症状」ではなく「項目・内容」と呼ぶ */
+  const W = tpl.free ? { part: '項目', def: '内容' } : { part: '部材', def: '症状' };
+  const sum = d.part || d.defects.length ? `${place}${esc(d.part ? pinTitle(d) : '')}　<span style="color:var(--open)">${esc(d.defects.join('・'))}</span>` : `${place}<span class="ph">${tpl.free ? '項目を入力してください' : '部材と症状を選んでください'}</span>`;
   const sh = S.cur.sheets?.find(s => s.id === d.sheetId);
   const floors = sh?.floors?.length ? sh.floors : FLOORS;
   const cand = [...new Set(zonesAt(sh, d.x, d.y).map(z => z.name))];
-  const placeSec = `<div><h4>場所<em class="opt">任意</em></h4>
+  const placeSec = tpl.noRoom ? '' : `<div><h4>場所<em class="opt">任意</em></h4>
     ${cand.length > 1 ? `<div class="pgrp"><span class="glbl">この場所の候補</span>${chips(cand, 'room', d.room, 'sm')}</div>` : ''}
     ${sh?.floors?.length === 1 ? '' : `<div class="chips" style="margin-bottom:8px">${chips(floors, 'floor', d.floor, 'sm')}</div>`}
     <div class="chips">${chips(roomList(d.room), 'room', d.room, 'sm')}</div>${free('room', '一覧にない部屋名（例：書斎、X3通り）')}</div>`;
@@ -1199,15 +1246,15 @@ function renderEditor(fromTop) {
   const inGroup = g => d.part && d.area === g[2] && g[1].includes(d.part);
   if (!groups.some(g => g[0] === ed.tab)) ed.tab = (groups.find(inGroup) || groups.find(g => g[0] === S.last?.area) || groups[0])?.[0];
   const tab = groups.find(g => g[0] === ed.tab);
-  const partSec = `<div><h4>① 部材<em>必須</em></h4>
+  const partSec = `<div><h4>① ${W.part}<em>必須</em></h4>
     <div class="pick2"><div class="cats">${groups.map(g => `<button class="${g[0] === ed.tab ? 'on' : ''} ${inGroup(g) ? 'has' : ''}" data-tab="${esc(g[0])}">${esc(g[0])}</button>`).join('')}</div>
       <div class="chips">${tab ? tab[1].map(p => partBtn(tab[2], p)).join('') : ''}</div></div>
-    ${free('part', '一覧にない部材（例：ニッチ、点検口枠）')}</div>`;
+    ${free('part', tpl.free ? '項目（例：外構フェンス、手直し箇所）' : '一覧にない部材（例：ニッチ、点検口枠）')}</div>`;
   const area = tpl.areas.find(a => a[0] === (d.part ? d.area : tab?.[2]));
   const baseDef = area && area[0] !== 'その他' ? area[2] : [...new Set(tpl.areas.flatMap(a => a[2]))];
   const defList = [...new Set([...baseDef, ...customList('defects'), ...d.defects])];
-  const defSec = `<div><h4>② 症状<em>必須・複数可</em></h4><div class="chips">${defList.map(v => `<button class="chip ${d.defects.includes(v) ? 'on' : ''}" data-def="${esc(v)}">${esc(v)}</button>`).join('')}</div>
-    ${free('defects', '一覧にない症状（例：ビス頭出）')}</div>`;
+  const defSec = `<div><h4>② ${W.def}<em>${tpl.free ? '任意・複数可' : '必須・複数可'}</em></h4><div class="chips">${defList.map(v => `<button class="chip ${d.defects.includes(v) ? 'on' : ''}" data-def="${esc(v)}">${esc(v)}</button>`).join('')}</div>
+    ${free('defects', tpl.free ? '内容（例：要交換、清掃お願いします）' : '一覧にない症状（例：ビス頭出）')}</div>`;
   const hasCustom = ['rooms', 'parts', 'defects'].some(k => customList(k).length);
   const photo = kind => (d.photos || []).filter(p => p.kind === kind).map(p => `<button class="thumb" data-photo="${esc(p.id)}"><img data-img="${esc(p.id)}" alt="写真"></button>`).join('');
   const spinners = Array.from({ length: ed.pending }, () => '<div class="thumb"><span class="spin"></span></div>').join('');
@@ -1226,7 +1273,7 @@ function renderEditor(fromTop) {
   }
   $('#panel').innerHTML = `
     <div class="ed-head"><span class="pin ${ed.isNew ? 'draft' : d.status}">${ed.isNew ? '＋' : pinNums()(d)}</span><div class="ed-sum">${sum}</div>
-      ${!ed.isNew ? `<button class="btn small" data-act="locate">図面で見る</button>` : ''}</div>
+      ${!ed.isNew && d.sheetId ? `<button class="btn small" data-act="locate">図面で見る</button>` : ''}</div>
     <div class="ed-body">
       ${sameBtn}
       ${partSec}
@@ -1237,7 +1284,7 @@ function renderEditor(fromTop) {
       <div><h4>メモ（任意）</h4><textarea id="ed-memo" placeholder="例：枠の左下、床から30cmあたり">${esc(d.memo)}</textarea></div>
       ${placeSec}
       ${status}
-      ${ed.isNew ? '<p class="hint" style="margin:0">位置を直すときは、図面をもう一度タップ。</p>' : ''}
+      ${ed.isNew && d.sheetId ? '<p class="hint" style="margin:0">位置を直すときは、図面をもう一度タップ。</p>' : ''}
       ${hasCustom ? '<button class="linkbtn" data-act="manage">自分で追加した部材・症状・部屋名を整理</button>' : ''}
     </div>
     <div class="ed-foot">
@@ -1331,7 +1378,7 @@ function manageDialog() {
   m.onclick = e => {
     if (e.target.closest('[data-x]')) { m.hidden = true; if (S.ed) renderEditor(); return; }
     const b = e.target.closest('[data-cdel]'); if (!b) return;
-    writePref(b.dataset.cdel, JSON.stringify(customList(b.dataset.cdel).filter(x => x !== b.dataset.v)));
+    writePref(prefKey(b.dataset.cdel), JSON.stringify(customList(b.dataset.cdel).filter(x => x !== b.dataset.v)));
     render();
   };
   render(); m.hidden = false;
@@ -1408,7 +1455,7 @@ async function savePin(msg) {
   const ed = S.ed; if (!ed) return;
   const d = ed.draft;
   if (ed.pending) return toast('写真を保存中です。少し待ってください');
-  if (!d.part || !d.defects.length) return toast('「部材」と「症状」を選ぶか入力してください');
+  if (tplOf(S.cur).free ? !d.part : !d.part || !d.defects.length) return toast(tplOf(S.cur).free ? '「項目」を入力してください' : '「部材」と「症状」を選ぶか入力してください');
   d.area ||= 'その他';
   d.defect = d.defects.join('・');
   if (d.status === 'fixed' && !(d.photos || []).some(p => p.kind === 'after')) return toast('是正後の写真を追加してください');
@@ -1641,44 +1688,46 @@ async function exportReport(sel, tag, share) {
       }
       plans += `<section class="plan"><div class="ph-head"><h2>${esc(sh.name)}</h2><span>${esc(insp.name)}　検査日 ${esc(insp.date || '')}　検査者 ${esc(insp.inspector || '')}</span></div><img src="${r.url()}"></section>`;
     }
-    let rows = '', lastGrp = null, i = 0;
+    /* 指摘一覧は2段組（写真ありでA4に8件、左の列→右の列の順）。並びは一覧と同じ（部屋ごと／分類ごと）。写真がない指摘は詰めて入る */
+    let rows = '', i = 0;
     for (const p of pins) {
       busy(`報告書を作成中… 写真 ${++i}/${pins.length}`);
-      if (groupOf(p) !== lastGrp) { lastGrp = groupOf(p); rows += `<div class="grp">${esc(lastGrp)}</div>`; }
       const imgs = async kind => { let h = ''; for (const x of (p.photos || []).filter(x => x.kind === kind)) { const r = await imgData(x.id, 520); if (r) h += `<img src="${r.url()}">`; } return h; };
       const before = await imgs('before'), after = await imgs('after');
       const dates = [p.fixedAt ? '是正 ' + fmtDate(p.fixedAt) : '', p.okAt ? '確認 ' + fmtDate(p.okAt) : ''].filter(Boolean).join('　');
+      const sheet = (insp.sheets?.length > 1 && insp.sheets.find(s => s.id === p.sheetId)?.name) || '';
       rows += `<div class="item">
         <div class="item-head"><span class="no" style="background:${COL[p.status]}">${num(p)}</span>
-          <div class="item-title">${pinPlace(p) ? `<small>${esc(pinPlace(p))}</small><br>` : ''}<b>${esc(pinTitle(p))}</b> <span class="def">${esc(defectText(p))}</span>${p.memo ? `<br><small>${esc(p.memo)}</small>` : ''}<br><small>${esc(insp.sheets?.find(s => s.id === p.sheetId)?.name || '')}</small></div>
-          <span class="stat" style="color:${COL[p.status]}">${ST[p.status]}</span></div>
-        ${before || after ? `<div class="photos">${before ? `<div class="pcol"><small>指摘写真</small><div class="pimgs">${before}</div></div>` : ''}${after ? `<div class="pcol"><small>是正後</small><div class="pimgs">${after}</div></div>` : ''}</div>` : ''}
-        <div class="item-foot"><small>${esc(dates)}</small><div class="box"></div></div></div>`;
+          <div class="item-title">${groupOf(p) !== NO_PLACE ? `<b class="pl">${esc(groupOf(p))}</b>` : ''}${sheet ? ` <small>${esc(sheet)}</small>` : ''}${groupOf(p) !== NO_PLACE || sheet ? '<br>' : ''}${esc(pinTitle(p))} <span class="def">${esc(defectText(p))}</span>${p.memo ? `<br><small>${esc(p.memo)}</small>` : ''}${dates ? `<br><small>${esc(dates)}</small>` : ''}</div>
+          <div class="item-side"><span class="stat" style="color:${COL[p.status]}">${ST[p.status]}</span><div class="box"></div></div></div>
+        ${before || after ? `<div class="photos">${before ? `<div class="pcol"><small>指摘写真</small><div class="pimgs">${before}</div></div>` : ''}${after ? `<div class="pcol"><small>是正後</small><div class="pimgs">${after}</div></div>` : ''}</div>` : ''}</div>`;
     }
     const c = countsOf(pins);
     const html = `<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(fileBase())}</title>
 <style>body{font-family:"BIZ UDPGothic","Yu Gothic","Meiryo",sans-serif;color:#16212e;margin:24px;font-size:13px}h1{font-size:20px;margin:0 0 6px}h2{font-size:15px;margin:18px 0 6px}
 .head{display:flex;gap:24px;flex-wrap:wrap;border-bottom:2px solid #16212e;padding-bottom:8px;margin-bottom:12px}.head div{min-width:120px}.head small{display:block;color:#5b6878}
 .plan img{width:100%;border:1px solid #ccc}.ph-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;border-bottom:1px solid #16212e;margin:18px 0 6px}.ph-head h2{margin:0}.ph-head span{font-size:12px}
-.grp{background:#16212e;color:#fff;font-weight:bold;padding:6px 10px;border-radius:6px;margin-top:16px}
-.item{border:1px solid #b9c2cc;border-radius:10px;padding:10px 12px;margin-top:10px}
-.item-head{display:flex;gap:10px;align-items:flex-start}
-.item-head .no{display:inline-block;flex:none;min-width:28px;height:28px;border-radius:14px;color:#fff;font-weight:bold;text-align:center;line-height:28px}
-.item-title{flex:1;min-width:0}
-.item-head .stat{flex:none;font-weight:bold;font-size:12px}
+.list{column-count:2;column-gap:3mm;margin-top:12px}
+.item{border:1px solid #b9c2cc;border-radius:6px;padding:2mm 2.5mm;font-size:11px;line-height:1.35;margin-bottom:3mm}
+.item-head{display:flex;gap:2mm;align-items:flex-start}
+.item-head .no{display:inline-block;flex:none;min-width:22px;height:22px;border-radius:11px;color:#fff;font-weight:bold;text-align:center;line-height:22px;font-size:12px}
+.item-title{flex:1;min-width:0}.item-title small{color:#5b6878}
+.item-title .pl{font-size:12px}
+.item-side{flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:1mm}
+.item-side .stat{font-weight:bold;font-size:11px}
 .def{color:#d23a2a;font-weight:bold}
-.photos{display:flex;gap:18px;flex-wrap:wrap;margin-top:8px}
-.pcol{display:flex;flex-direction:column;gap:4px}
-.pcol>small{color:#5b6878;font-weight:bold}
-.pimgs{display:flex;flex-wrap:wrap;gap:4px}
-.pimgs img{width:150px;border:1px solid #ccc}
-.item-foot{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;margin-top:8px;color:#5b6878}
-.box{border:1px solid #888;width:44px;height:44px;flex:none;position:relative}.box::before{content:"確認印";font-size:9px;color:#888;position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
-.item,.grp{page-break-inside:avoid}.plan{page-break-after:always}@page{size:A4;margin:12mm}@media print{body{margin:0}}</style></head><body>
+.photos{display:flex;gap:2mm;margin-top:1.5mm}
+.pcol{display:flex;flex-direction:column;gap:.5mm;min-width:0}
+.pcol>small{color:#5b6878;font-weight:bold;font-size:9px}
+.pimgs{display:flex;gap:1mm}
+.pimgs img{height:32mm;width:auto;max-width:40mm;object-fit:cover;border:1px solid #ccc}
+.box{border:1px solid #888;width:11mm;height:11mm;flex:none;position:relative}.box::before{content:"確認印";font-size:8px;color:#888;position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+@media screen and (max-width:600px){.list{column-count:1}}
+.item{break-inside:avoid;page-break-inside:avoid}.plan{page-break-after:always}@page{size:A4;margin:12mm}@media print{body{margin:0}}</style></head><body>
 <h1>${esc(tplOf(insp).label)} 指摘一覧${tag ? `（${esc(tag.replace('_', ' '))}）` : ''}</h1>
 <div class="head"><div><small>現場名</small>${esc(insp.name)}</div><div><small>検査日</small>${esc(insp.date || '')}</div><div><small>検査者</small>${esc(insp.inspector || '')}</div><div><small>出力日</small>${new Date().toLocaleDateString('ja-JP')}</div><div><small>件数</small>全${pins.length}件（未是正${c.open}・是正済${c.fixed}・確認済${c.ok}）</div></div>
 ${plans}
-${rows || '<p>指摘はありません</p>'}
+${rows ? `<div class="list">${rows}</div>` : '<p>指摘はありません</p>'}
 </body></html>`;
     busy();
     await saveFile(fileBase() + (tag ? '_' + tag : '') + '_報告書.html',new Blob([html], { type: 'text/html' }), share);
